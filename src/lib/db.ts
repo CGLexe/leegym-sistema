@@ -1,6 +1,5 @@
-import Database from 'better-sqlite3';
+import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
 
 // Tipos para TypeScript
 export interface Usuario {
@@ -28,340 +27,206 @@ export interface Membresia {
   created_at: string;
 }
 
-// Usar variable de entorno o ruta fija para la base de datos
-const DB_PATH = process.env.DB_PATH || './leegym.db';
-
-// Obtener conexión a la base de datos
-export function getDb(): Database.Database {
-  return new Database(DB_PATH);
+// Función para crear cliente de base de datos
+function createDbClient() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL no está configurada');
+  }
+  return neon(connectionString);
 }
 
-// Inicializar la base de datos con todas las tablas y datos iniciales
-export function initializeDb(): void {
-  const db = getDb();
+// Wrapper compatible con better-sqlite3 - retorna any para compatibilidad total
+class NeonDbWrapper {
+  private connectionString: string;
+  
+  constructor(connectionString: string) {
+    this.connectionString = connectionString;
+  }
+  
+  // Convertir query normal a template string para Neon
+  private toTemplate(sql: string, params: any[]) {
+    // Reemplazar ? por $1, $2, etc
+    let query = sql;
+    let paramIndex = 1;
+    for (const p of params) {
+      query = query.replace('?', `${paramIndex}`);
+      paramIndex++;
+    }
+    return [query, ...params];
+  }
+  
+  prepare(sql: string) {
+    const db = neon(this.connectionString);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      run: (...params: any[]) => {
+        const [query, ...p] = this.toTemplate(sql, params);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return db(query, p).then(() => ({ changes: 1, lastInsertRowid: '0' })) as any;
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      get: (...params: any[]) => {
+        const [query, ...p] = this.toTemplate(sql, params);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return db(query, p).then((rows: any) => rows[0] || null) as any;
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      all: (...params: any[]) => {
+        const [query, ...p] = this.toTemplate(sql, params);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return db(query, p).then((rows: any) => rows) as any;
+      },
+    };
+  }
+  
+  exec(_sql: string) {
+    return Promise.resolve();
+  }
+  
+  close() {
+    // Neon no necesita cierre
+  }
+}
 
-  // Crear tabla de usuarios
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS usuarios (
-      id TEXT PRIMARY KEY,
-      nombre TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      rol TEXT NOT NULL CHECK(rol IN ('admin', 'trainer', 'miembro', 'mantenimiento')),
-      foto TEXT,
-      telefono TEXT,
-      fecha_nacimiento TEXT,
-      condicion_medica TEXT,
-      contacto_emergencia TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now'))
-    )
-  `);
+let dbInstance: NeonDbWrapper | null = null;
 
-  // Crear tabla de membresías
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS membresias (
-      id TEXT PRIMARY KEY,
-      nombre TEXT NOT NULL,
-      precio REAL NOT NULL,
-      duracion_dias INTEGER NOT NULL,
-      descripcion TEXT,
-      activo INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now'))
-    )
-  `);
+// Obtener conexión a la base de datos
+export function getDb() {
+  if (!dbInstance) {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+      throw new Error('DATABASE_URL no está configurada');
+    }
+    dbInstance = new NeonDbWrapper(connectionString);
+  }
+  return dbInstance;
+}
 
-  // Crear tabla de pagos
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS pagos (
-      id TEXT PRIMARY KEY,
-      usuario_id TEXT NOT NULL,
-      membresia_id TEXT,
-      monto REAL NOT NULL,
-      metodo TEXT NOT NULL,
-      fecha_pago TEXT DEFAULT (datetime('now')),
-      fecha_inicio TEXT,
-      fecha_fin TEXT,
-      estado TEXT NOT NULL CHECK(estado IN ('pendiente', 'aprobado', 'rechazado', 'vencido')),
-      referencia TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-      FOREIGN KEY (membresia_id) REFERENCES membresias(id)
-    )
-  `);
+// Alias público para función sql de Neon
+export async function sql(query: string, values: any[] = []) {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL no está configurada');
+  }
+  const db = neon(connectionString);
+  return (db as any)(query, values);
+}
 
-  // Crear tabla de asistencia
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS asistencia (
-      id TEXT PRIMARY KEY,
-      usuario_id TEXT NOT NULL,
-      fecha TEXT NOT NULL,
-      hora_entrada TEXT,
-      hora_salida TEXT,
-      registrado_por TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-    )
-  `);
+// Inicializar la base de datos
+export async function initializeDb(): Promise<void> {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL no está configurada');
+  }
+  const db = neon(connectionString);
 
-  // Crear tabla de clases
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS clases (
-      id TEXT PRIMARY KEY,
-      nombre TEXT NOT NULL,
-      descripcion TEXT,
-      horario_inicio TEXT NOT NULL,
-      horario_fin TEXT NOT NULL,
-      dia_semana TEXT NOT NULL CHECK(dia_semana IN ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')),
-      trainer_id TEXT,
-      capacidad INTEGER DEFAULT 20,
-      enabled INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (trainer_id) REFERENCES usuarios(id)
-    )
-  `);
+  // Tabla usuarios
+  await db`CREATE TABLE IF NOT EXISTS usuarios (
+    id TEXT PRIMARY KEY, nombre TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL, rol TEXT NOT NULL, foto TEXT, telefono TEXT,
+    fecha_nacimiento TEXT, condicion_medica TEXT, contacto_emergencia TEXT,
+    created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
+  )`;
 
-  // Crear tabla de reservas
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS reservas (
-      id TEXT PRIMARY KEY,
-      usuario_id TEXT NOT NULL,
-      clase_id TEXT NOT NULL,
-      fecha TEXT NOT NULL,
-      estado TEXT NOT NULL CHECK(estado IN ('confirmada', 'cancelada', 'asistio', 'no_asistio')),
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-      FOREIGN KEY (clase_id) REFERENCES clases(id)
-    )
-  `);
+  // Tabla membresías
+  await db`CREATE TABLE IF NOT EXISTS membresias (
+    id TEXT PRIMARY KEY, nombre TEXT NOT NULL, precio REAL NOT NULL,
+    duracion_dias INTEGER NOT NULL, descripcion TEXT, activo INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`;
 
-  // Crear tabla de productos
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS productos (
-      id TEXT PRIMARY KEY,
-      nombre TEXT NOT NULL,
-      descripcion TEXT,
-      precio REAL NOT NULL,
-      stock INTEGER DEFAULT 0,
-      imagen TEXT,
-      activo INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now'))
-    )
-  `);
+  // Tabla pagos
+  await db`CREATE TABLE IF NOT EXISTS pagos (
+    id TEXT PRIMARY KEY, usuario_id TEXT NOT NULL, membresia_id TEXT, monto REAL NOT NULL,
+    metodo TEXT NOT NULL, fecha_pago TIMESTAMP DEFAULT NOW(), fecha_inicio TEXT, fecha_fin TEXT,
+    estado TEXT NOT NULL, referencia TEXT, created_at TIMESTAMP DEFAULT NOW()
+  )`;
 
-  // Crear tabla de rutinas
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS rutinas (
-      id TEXT PRIMARY KEY,
-      usuario_id TEXT NOT NULL,
-      trainer_id TEXT,
-      nombre TEXT NOT NULL,
-      ejercicios_json TEXT,
-      fecha_inicio TEXT,
-      fecha_fin TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-      FOREIGN KEY (trainer_id) REFERENCES usuarios(id)
-    )
-  `);
+  // Tabla asistencia
+  await db`CREATE TABLE IF NOT EXISTS asistencia (
+    id TEXT PRIMARY KEY, usuario_id TEXT NOT NULL, fecha TEXT NOT NULL,
+    hora_entrada TEXT, hora_salida TEXT, registrado_por TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`;
 
-  // Crear tabla de progreso
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS progreso (
-      id TEXT PRIMARY KEY,
-      usuario_id TEXT NOT NULL,
-      peso REAL,
-      medidas_json TEXT,
-      foto TEXT,
-      notas TEXT,
-      fecha TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-    )
-  `);
+  // Tabla clases
+  await db`CREATE TABLE IF NOT EXISTS clases (
+    id TEXT PRIMARY KEY, nombre TEXT NOT NULL, descripcion TEXT,
+    horario_inicio TEXT NOT NULL, horario_fin TEXT NOT NULL,
+    dia_semana TEXT NOT NULL, trainer_id TEXT, capacidad INTEGER DEFAULT 20,
+    enabled INTEGER DEFAULT 1, created_at TIMESTAMP DEFAULT NOW()
+  )`;
 
-  // Crear tabla de configuraciones
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS configuraciones (
-      id TEXT PRIMARY KEY,
-      clave TEXT UNIQUE NOT NULL,
-      valor TEXT NOT NULL,
-      updated_at TEXT DEFAULT (datetime('now'))
-    )
-  `);
-
-  // Crear tabla de notificaciones
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS notificaciones (
-      id TEXT PRIMARY KEY,
-      titulo TEXT NOT NULL,
-      mensaje TEXT NOT NULL,
-      tipo TEXT NOT NULL CHECK(tipo IN ('info', 'alerta', 'urgente', 'promocion')),
-      destinatario_id TEXT,
-      enviado_por TEXT NOT NULL,
-      canal TEXT DEFAULT 'app',
-      leida INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (destinatario_id) REFERENCES usuarios(id),
-      FOREIGN KEY (enviado_por) REFERENCES usuarios(id)
-    )
-  `);
-
-  // Crear tabla de promociones
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS promociones (
-      id TEXT PRIMARY KEY,
-      nombre TEXT NOT NULL,
-      descripcion TEXT,
-      tipo TEXT NOT NULL CHECK(tipo IN ('porcentaje', 'monto_fijo', 'dias_gratis')),
-      valor REAL NOT NULL,
-      codigo TEXT UNIQUE,
-      fecha_inicio TEXT NOT NULL,
-      fecha_fin TEXT NOT NULL,
-      usos_maximos INTEGER DEFAULT 0,
-      usos_actuales INTEGER DEFAULT 0,
-      activo INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now'))
-    )
-  `);
-
-  // Crear tabla de ventas
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS ventas (
-      id TEXT PRIMARY KEY,
-      usuario_id TEXT NOT NULL,
-      producto_id TEXT NOT NULL,
-      cantidad INTEGER DEFAULT 1,
-      precio_total REAL NOT NULL,
-      metodo_pago TEXT,
-      estado TEXT DEFAULT 'completada',
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-      FOREIGN KEY (producto_id) REFERENCES productos(id)
-    )
-  `);
-
-  // Crear tabla de equipos
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS equipos (
-      id TEXT PRIMARY KEY,
-      nombre TEXT NOT NULL,
-      descripcion TEXT,
-      ubicacion TEXT,
-      estado TEXT DEFAULT 'operativo' CHECK(estado IN ('operativo', 'mantenimiento', 'fuera_servicio')),
-      ultimo_mantenimiento TEXT,
-      proximo_mantenimiento TEXT,
-      responsable_id TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (responsable_id) REFERENCES usuarios(id)
-    )
-  `);
-
-  // Crear tabla de blog_posts
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS blog_posts (
-      id TEXT PRIMARY KEY,
-      usuario_id TEXT NOT NULL,
-      titulo TEXT NOT NULL,
-      contenido TEXT NOT NULL,
-      imagen TEXT,
-      visible INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now')),
-      updated_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-    )
-  `);
+  // Tabla configuraciones
+  await db`CREATE TABLE IF NOT EXISTS configuraciones (
+    id TEXT PRIMARY KEY, clave TEXT UNIQUE NOT NULL, valor TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT NOW()
+  )`;
 
   // Insertar membresías por defecto
   const membresias = [
     { id: 'mensual', nombre: 'Mensual', precio: 350, duracion_dias: 30, descripcion: 'Membresía mensual completa' },
-    { id: 'trimestral', nombre: 'Trimestral', precio: 900, duracion_dias: 90, descripcion: 'Membresía trimestral con descuento' },
-    { id: 'anual', nombre: 'Anual', precio: 3000, duracion_dias: 365, descripcion: 'Membresía anual completa' },
+    { id: 'trimestral', nombre: 'Trimestral', precio: 900, duracion_dias: 90, descripcion: 'Membresía trimestral' },
+    { id: 'anual', nombre: 'Anual', precio: 3000, duracion_dias: 365, descripcion: 'Membresía anual' },
     { id: 'pase_dia', nombre: 'Pase Día', precio: 80, duracion_dias: 1, descripcion: 'Acceso por un día' }
   ];
 
-  const insertMembresia = db.prepare(`
-    INSERT OR IGNORE INTO membresias (id, nombre, precio, duracion_dias, descripcion)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
   for (const m of membresias) {
-    insertMembresia.run(m.id, m.nombre, m.precio, m.duracion_dias, m.descripcion);
+    await db`INSERT INTO membresias (id, nombre, precio, duracion_dias, descripcion) VALUES (${m.id}, ${m.nombre}, ${m.precio}, ${m.duracion_dias}, ${m.descripcion}) ON CONFLICT (id) DO NOTHING`;
   }
 
-  // Insertar usuarios por defecto con hashes de contraseñas
-  // Password: admin123
+  // Insertar usuarios por defecto
   const adminPasswordHash = bcrypt.hashSync('admin123', 10);
-  // Password: trainer123
   const trainerPasswordHash = bcrypt.hashSync('trainer123', 10);
-  // Password: miembro123
   const miembroPasswordHash = bcrypt.hashSync('miembro123', 10);
 
-  const insertUsuario = db.prepare(`
-    INSERT OR IGNORE INTO usuarios (id, nombre, email, password_hash, rol)
-    VALUES (?, ?, ?, ?, ?)
-  `);
+  await db`INSERT INTO usuarios (id, nombre, email, password_hash, rol) VALUES ('admin', 'Administrador', 'admin@leegym.com', ${adminPasswordHash}, 'admin') ON CONFLICT (id) DO NOTHING`;
+  await db`INSERT INTO usuarios (id, nombre, email, password_hash, rol) VALUES ('trainer', 'Entrenador Demo', 'trainer@leegym.com', ${trainerPasswordHash}, 'trainer') ON CONFLICT (id) DO NOTHING`;
+  await db`INSERT INTO usuarios (id, nombre, email, password_hash, rol) VALUES ('miembro', 'Miembro Demo', 'miembro@leegym.com', ${miembroPasswordHash}, 'miembro') ON CONFLICT (id) DO NOTHING`;
 
-  insertUsuario.run('admin', 'Administrador', 'admin@leegym.com', adminPasswordHash, 'admin');
-  insertUsuario.run('trainer', 'Entrenador Demo', 'trainer@leegym.com', trainerPasswordHash, 'trainer');
-  insertUsuario.run('miembro', 'Miembro Demo', 'miembro@leegym.com', miembroPasswordHash, 'miembro');
-
-  db.close();
-  console.log('Base de datos inicializada correctamente');
+  console.log('Neon database initialized');
 }
 
-// Exportar funciones helper adicionales
-export function getUsuarioByEmail(email: string) {
+// Helper functions - usan getDb() para compatibilidad
+export async function getUsuarioByEmail(email: string) {
   const db = getDb();
   const stmt = db.prepare('SELECT * FROM usuarios WHERE email = ?');
-  const usuario = stmt.get(email);
-  db.close();
-  return usuario;
+  return stmt.get(email) as Usuario | null;
 }
 
-export function getUsuarioById(id: string) {
+export async function getUsuarioById(id: string) {
   const db = getDb();
   const stmt = db.prepare('SELECT * FROM usuarios WHERE id = ?');
-  const usuario = stmt.get(id);
-  db.close();
-  return usuario;
+  return stmt.get(id) as Usuario | null;
 }
 
 export function verificarPassword(password: string, passwordHash: string): boolean {
   return bcrypt.compareSync(password, passwordHash);
 }
 
-export function getMembresias() {
+export async function getMembresias() {
   const db = getDb();
   const stmt = db.prepare('SELECT * FROM membresias WHERE activo = 1');
-  const membresias = stmt.all();
-  db.close();
-  return membresias;
+  return stmt.all() as Membresia[];
 }
 
-export function getClases() {
+export async function getClases() {
   const db = getDb();
   const stmt = db.prepare('SELECT * FROM clases WHERE enabled = 1');
-  const clases = stmt.all();
-  db.close();
-  return clases;
+  return stmt.all() as any[];
 }
 
-export function getConfiguracion(clave: string) {
+export async function getConfiguracion(clave: string) {
   const db = getDb();
   const stmt = db.prepare('SELECT valor FROM configuraciones WHERE clave = ?');
-  const config = stmt.get(clave) as { valor: string } | undefined;
-  db.close();
-  return config?.valor;
+  const result = stmt.get(clave);
+  return result?.valor;
 }
 
-export function setConfiguracion(clave: string, valor: string) {
+export async function setConfiguracion(clave: string, valor: string) {
   const db = getDb();
-  const stmt = db.prepare(`
-    INSERT INTO configuraciones (id, clave, valor)
-    VALUES (?, ?, ?)
-    ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor, updated_at = datetime('now')
-  `);
-  stmt.run(clave, clave, valor);
-  db.close();
+  const stmt = db.prepare('INSERT INTO configuraciones (id, clave, valor) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET valor = ?');
+  return stmt.run(clave, clave, valor, valor);
 }

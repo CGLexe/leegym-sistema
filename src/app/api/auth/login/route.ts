@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     }
 
     // Buscar usuario por email
-    const usuario = getUsuarioByEmail(email) as Usuario | undefined;
+    const usuario = await getUsuarioByEmail(email);
 
     if (!usuario) {
       return NextResponse.json(

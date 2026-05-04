@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       SELECT id, hora_entrada FROM asistencia 
       WHERE usuario_id = ? AND date(fecha) = date('now')
     `);
-    const existente = checkStmt.get(usuarioId) as { id: string; hora_entrada: string } | undefined;
+    const existente = checkStmt.get(usuarioId) as any;
 
     if (existente) {
       // Eliminar entrada existente
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el usuario existe y es miembro
     const userStmt = db.prepare("SELECT nombre FROM usuarios WHERE id = ? AND rol = 'miembro'");
-    const usuario = userStmt.get(usuarioId) as { nombre: string } | undefined;
+    const usuario = userStmt.get(usuarioId) as any;
 
     if (!usuario) {
       db.close();

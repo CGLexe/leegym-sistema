@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     }
 
     // Obtener datos completos del usuario desde la base de datos
-    const usuario = getUsuarioById(payload.id) as Usuario | undefined;
+    const usuario = await getUsuarioById(payload.id);
 
     if (!usuario) {
       return NextResponse.json(
