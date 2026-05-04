@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  /* LEE GYM Colors */
+  --black: #080808;
+  --dark: #101010;
+  --card: #161616;
+  --gold: #e8a320;
+  --gold-light: #f5c25a;
+  --red: #c62828;
+  --green: #25d366;
+  --white: #f2ede3;
+  --muted: #6b6b6b;
+  --border: rgba(232, 163, 32, 0.15);
+  
+  --background: var(--black);
+  --foreground: var(--white);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+  /* Custom colors */
+  --color-lee-black: var(--black);
+  --color-lee-dark: var(--dark);
+  --color-lee-card: var(--card);
+  --color-lee-gold: var(--gold);
+  --color-lee-gold-light: var(--gold-light);
+  --color-lee-red: var(--red);
+  --color-lee-green: var(--green);
+  --color-lee-white: var(--white);
+  --color-lee-muted: var(--muted);
+  --color-lee-border: var(--border);
+  
+  /* Font families */
+  --font-sans: var(--font-barlow), var(--font-barlow-condensed), system-ui, sans-serif;
+  --font-display: var(--font-bebas), system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gold);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold-light);
+}
