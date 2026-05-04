@@ -79,12 +79,12 @@ export async function POST(request: NextRequest) {
       capacidad || 20
     );
 
-    const getClase = db.prepare(\`
+    const getClase = db.prepare(`
       SELECT c.*, u.nombre as trainer_nombre 
       FROM clases c
       LEFT JOIN usuarios u ON c.trainer_id = u.id
       WHERE c.id = ?
-    \`);
+    `);
     
     const nuevaClase = getClase.get(id);
 

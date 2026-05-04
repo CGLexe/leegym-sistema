@@ -3,10 +3,10 @@ import { getDb } from "@/lib/db";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     const body = await request.json();
     const {
       nombre,
@@ -71,12 +71,12 @@ export async function PUT(
     const stmt = db.prepare(query);
     stmt.run(...values);
 
-    const getClase = db.prepare(\`
+    const getClase = db.prepare(`
       SELECT c.*, u.nombre as trainer_nombre 
       FROM clases c
       LEFT JOIN usuarios u ON c.trainer_id = u.id
       WHERE c.id = ?
-    \`);
+    `);
     
     const claseActualizada = getClase.get(id);
 
@@ -101,10 +101,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     const db = getDb();
 
     // En lugar de borrar físicamente, podemos deshabilitarla

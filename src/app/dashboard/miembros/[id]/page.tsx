@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Loader2
+  Loader2,
+  Plus
 } from "lucide-react";
 import MiembroForm from "@/components/MiembroForm";
 

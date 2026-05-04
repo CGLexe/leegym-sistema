@@ -72,7 +72,7 @@ export default function PersonalPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingId ? \`/api/personal/\${editingId}\` : "/api/personal";
+      const url = editingId ? `/api/personal/${editingId}` : "/api/personal";
       const method = editingId ? "PUT" : "POST";
 
       const dataToSubmit = { ...formData };
@@ -103,7 +103,7 @@ export default function PersonalPage() {
     }
     if (!confirm("¿Estás seguro de eliminar este usuario?")) return;
     try {
-      const res = await fetch(\`/api/personal/\${id}\`, { method: "DELETE" });
+      const res = await fetch(`/api/personal/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al eliminar");
       await fetchPersonal();
@@ -188,9 +188,9 @@ export default function PersonalPage() {
                       <button
                         onClick={() => handleDelete(p.id)}
                         disabled={p.id === 'admin'}
-                        className={\`p-2 transition-colors bg-lee-dark rounded-lg border border-lee-border \${
+                        className={`p-2 transition-colors bg-lee-dark rounded-lg border border-lee-border ${
                           p.id === 'admin' ? 'opacity-50 cursor-not-allowed text-lee-muted' : 'text-lee-muted hover:text-lee-red'
-                        }\`}
+                        }`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

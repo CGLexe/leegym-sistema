@@ -3,9 +3,15 @@ import Stripe from "stripe";
 import { getStripeProduct } from "@/lib/stripe-config";
 import { getDb } from "@/lib/db";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-04-10" as any, // Using type 'any' to bypass latest typescript Stripe version requirement
-});
+function getStripe() {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    throw new Error("STRIPE_SECRET_KEY no está configurada en las variables de entorno");
+  }
+  return new Stripe(stripeKey, {
+    apiVersion: "2024-04-10" as any,
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     const origin = origin_url || request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       payment_method_types: ["card"],
       line_items: [
         {

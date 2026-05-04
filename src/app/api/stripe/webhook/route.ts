@@ -4,9 +4,15 @@ import { getDb } from "@/lib/db";
 import { v4 as uuidv4 } from "uuid";
 import { getStripeProduct } from "@/lib/stripe-config";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2024-04-10" as any,
-});
+function getStripe() {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    throw new Error("STRIPE_SECRET_KEY no está configurada en las variables de entorno");
+  }
+  return new Stripe(stripeKey, {
+    apiVersion: "2024-04-10" as any,
+  });
+}
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -22,7 +28,7 @@ export async function POST(request: NextRequest) {
       event = JSON.parse(body);
       console.warn("WARN: Stripe webhook secret not configured. Bypassing signature verification.");
     } else {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      event = getStripe().webhooks.constructEvent(body, signature, webhookSecret);
     }
   } catch (err: any) {
     console.error(`Webhook signature verification failed: ${err.message}`);
@@ -85,7 +91,7 @@ export async function POST(request: NextRequest) {
         }
         
         // Es un pago recurrente
-        const subscriptionId = invoice.subscription as string;
+        const subscriptionId = (invoice as any).subscription as string;
         if (!subscriptionId) break;
         
         // Para encontrar el usuario, necesitamos buscar en la DB por el customer o usar metadata de la subscripción

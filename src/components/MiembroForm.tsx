@@ -7,11 +7,11 @@ interface Miembro {
   id?: string;
   nombre: string;
   email: string;
-  telefono?: string;
-  foto?: string;
-  fecha_nacimiento?: string;
-  condicion_medica?: string;
-  contacto_emergencia?: string;
+  telefono?: string | null;
+  foto?: string | null;
+  fecha_nacimiento?: string | null;
+  condicion_medica?: string | null;
+  contacto_emergencia?: string | null;
 }
 
 interface MiembroFormProps {
@@ -181,7 +181,7 @@ export default function MiembroForm({ isOpen, onClose, onSuccess, editingMiembro
             <input
               type="tel"
               name="telefono"
-              value={formData.telefono}
+              value={formData.telefono || ""}
               onChange={handleChange}
               className="w-full px-4 py-2.5 bg-lee-card border border-lee-border rounded-lg text-lee-white placeholder-lee-muted/50 focus:outline-none focus:border-lee-gold focus:ring-1 focus:ring-lee-gold/50 transition-colors"
               placeholder="Número de teléfono"
@@ -196,7 +196,7 @@ export default function MiembroForm({ isOpen, onClose, onSuccess, editingMiembro
             <input
               type="date"
               name="fecha_nacimiento"
-              value={formData.fecha_nacimiento}
+              value={formData.fecha_nacimiento || ""}
               onChange={handleChange}
               className="w-full px-4 py-2.5 bg-lee-card border border-lee-border rounded-lg text-lee-white placeholder-lee-muted/50 focus:outline-none focus:border-lee-gold focus:ring-1 focus:ring-lee-gold/50 transition-colors"
             />
@@ -209,7 +209,7 @@ export default function MiembroForm({ isOpen, onClose, onSuccess, editingMiembro
             </label>
             <textarea
               name="condicion_medica"
-              value={formData.condicion_medica}
+              value={formData.condicion_medica || ""}
               onChange={handleChange}
               rows={2}
               className="w-full px-4 py-2.5 bg-lee-card border border-lee-border rounded-lg text-lee-white placeholder-lee-muted/50 focus:outline-none focus:border-lee-gold focus:ring-1 focus:ring-lee-gold/50 transition-colors resize-none"
@@ -224,7 +224,7 @@ export default function MiembroForm({ isOpen, onClose, onSuccess, editingMiembro
             </label>
             <textarea
               name="contacto_emergencia"
-              value={formData.contacto_emergencia}
+              value={formData.contacto_emergencia || ""}
               onChange={handleChange}
               rows={2}
               className="w-full px-4 py-2.5 bg-lee-card border border-lee-border rounded-lg text-lee-white placeholder-lee-muted/50 focus:outline-none focus:border-lee-gold focus:ring-1 focus:ring-lee-gold/50 transition-colors resize-none"
@@ -241,7 +241,7 @@ export default function MiembroForm({ isOpen, onClose, onSuccess, editingMiembro
               <input
                 type="url"
                 name="foto"
-                value={formData.foto}
+                value={formData.foto || ""}
                 onChange={handleChange}
                 className="flex-1 px-4 py-2.5 bg-lee-card border border-lee-border rounded-lg text-lee-white placeholder-lee-muted/50 focus:outline-none focus:border-lee-gold focus:ring-1 focus:ring-lee-gold/50 transition-colors"
                 placeholder="https://ejemplo.com/foto.jpg"

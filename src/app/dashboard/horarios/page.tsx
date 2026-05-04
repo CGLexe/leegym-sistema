@@ -99,7 +99,7 @@ export default function HorariosPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingId ? \`/api/clases/\${editingId}\` : "/api/clases";
+      const url = editingId ? `/api/clases/${editingId}` : "/api/clases";
       const method = editingId ? "PUT" : "POST";
       
       const res = await fetch(url, {
@@ -120,7 +120,7 @@ export default function HorariosPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("¿Estás seguro de eliminar esta clase?")) return;
     try {
-      const res = await fetch(\`/api/clases/\${id}\`, { method: "DELETE" });
+      const res = await fetch(`/api/clases/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Error al eliminar");
       await fetchClases();
     } catch (err: any) {
