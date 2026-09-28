@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Bebas_Neue, Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
-const bebazNeue = Bebas_Neue({
+const bebasNeue = Bebas_Neue({
   variable: "--font-bebas",
   weight: "400",
   subsets: ["latin"],
@@ -17,25 +17,33 @@ const barlow = Barlow({
 const barlowCondensed = Barlow_Condensed({
   variable: "--font-barlow-condensed",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "LEE GYM - Sistema de Gestión",
-  description: "Sistema de gestión para LEE GYM",
+  title: "LEE GYM | Gimnasio",
+  description:
+    "Servicios, productos y agenda tu cita en LEE GYM.",
+  keywords: ["gimnasio", "fitness", "entrenamiento", "LEE GYM"],
+  openGraph: {
+    title: "LEE GYM | Gimnasio",
+    description: "Agenda tu cita en LEE GYM.",
+    locale: "es_MX",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
-      lang="es"
-      className={`${bebazNeue.variable} ${barlow.variable} ${barlowCondensed.variable} font-sans h-full antialiased`}
+      lang="es-MX"
+      className={`${bebasNeue.variable} ${barlow.variable} ${barlowCondensed.variable} font-sans h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-lee-black text-lee-white">{children}</body>
+      <body className="min-h-full flex flex-col bg-lee-black text-lee-white">
+        {children}
+      </body>
     </html>
   );
 }

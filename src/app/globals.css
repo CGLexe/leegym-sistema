@@ -36,6 +36,7 @@
   /* Font families */
   --font-sans: var(--font-barlow), var(--font-barlow-condensed), system-ui, sans-serif;
   --font-display: var(--font-bebas), system-ui, sans-serif;
+  --font-condensed: var(--font-barlow-condensed), system-ui, sans-serif;
 }
 
 body {
