@@ -14,8 +14,8 @@ export const PENDIENTE = "PENDIENTE";
 export const negocio = {
   nombre: "LEE GYM",
   // ---------------------------------------------------------------- contacto
-  whatsapp: PENDIENTE,
-  telefono: PENDIENTE,
+  whatsapp: "529536112423",
+  telefono: "953 611 2423",
   email: PENDIENTE,
   instagram: PENDIENTE,
   facebook: PENDIENTE,
